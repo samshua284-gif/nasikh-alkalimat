@@ -405,10 +405,22 @@
     });
   });
 
-  // الترجمة عبر خدمة Google المجانية — تحتاج اتصالاً
+  // الترجمة: دون اتصال إن توفّر محركها (داخل التطبيق)، وإلا عبر خدمة Google — تحتاج اتصالاً
   function translateTo(tl, btn) {
     var t = outText.value.trim();
     if (!t) { copyMsg.textContent = 'لا يوجد نص لترجمته — اقرأ صورة أولاً.'; return; }
+    if (window.OFFLINE_TRANSLATE) {
+      btn.disabled = true;
+      copyMsg.textContent = 'جارٍ الترجمة دون اتصال…';
+      window.OFFLINE_TRANSLATE(t, tl,
+        function (res) { transText.value = res; copyMsg.textContent = 'اكتملت الترجمة دون اتصال.'; btn.disabled = false; },
+        function () { onlineTranslate(t, tl, btn); },
+        function (p) { copyMsg.textContent = p; });
+      return;
+    }
+    onlineTranslate(t, tl, btn);
+  }
+  function onlineTranslate(t, tl, btn) {
     btn.disabled = true;
     copyMsg.textContent = 'جارٍ الترجمة…';
     var chunks = [];
