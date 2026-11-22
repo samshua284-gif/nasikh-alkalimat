@@ -44,6 +44,24 @@
   }
   .trbox { border:1.5px solid #b0bec5; border-radius:14px; padding:12px; background:#f7faf8; margin-top:12px; }
   .trlegend { font-size:12px; color:#78909c; margin-top:9px; line-height:1.8; }
+  .langpick { font:inherit; font-weight:600; padding:10px 14px; border:1.5px solid #b0bec5; border-radius:10px; background:#fff; color:#263238; cursor:pointer; }
+  .trstatus { margin-top:12px; padding:12px 16px; border-radius:12px; font-weight:700; font-size:15px; text-align:center; color:#fff; background:linear-gradient(135deg,#00897b,#26a69a); box-shadow:0 2px 10px rgba(0,137,123,.28); }
+  .trstatus.busy { animation:trpulse 1.6s ease-in-out infinite; }
+  .trstatus.done { background:linear-gradient(135deg,#2e7d32,#43a047); box-shadow:0 2px 10px rgba(46,125,50,.28); }
+  .trstatus.err { background:linear-gradient(135deg,#c62828,#e53935); box-shadow:0 2px 10px rgba(198,40,40,.28); }
+  @keyframes trpulse { 0%,100% { opacity:1; } 50% { opacity:.78; } }
+  .sheetwrap { position:fixed; inset:0; background:rgba(20,30,40,.45); z-index:50; display:flex; align-items:flex-end; justify-content:center; }
+  .sheet { width:100%; max-width:520px; max-height:78vh; overflow-y:auto; border-radius:22px 22px 0 0; padding:14px 14px 22px; background:rgba(255,255,255,.85); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); box-shadow:0 -8px 32px rgba(0,0,0,.25); animation:slideup .22s ease-out; }
+  @keyframes slideup { from { transform:translateY(40px); opacity:.4; } to { transform:none; opacity:1; } }
+  .sheet-head { display:flex; align-items:center; justify-content:space-between; font-weight:800; font-size:17px; color:#263238; padding:2px 4px 10px; }
+  .sheet-x { border:none; background:rgba(0,0,0,.06); width:34px; height:34px; border-radius:50%; font-size:15px; cursor:pointer; color:#37474f; }
+  .sheet-group { font-weight:800; font-size:13.5px; padding:9px 12px; border-radius:10px; margin:10px 0 6px; }
+  .sheet-group.off { background:#e6f4ea; color:#1b5e20; border:1px solid #a5d6a7; }
+  .sheet-group.on { background:#e8eefc; color:#1a3a6b; border:1px solid #a9bde8; }
+  .sheet-item { display:flex; align-items:center; justify-content:space-between; width:100%; padding:13px 12px; border:none; border-bottom:1px solid rgba(0,0,0,.05); background:transparent; font:inherit; font-size:16px; font-weight:600; color:#263238; cursor:pointer; text-align:right; }
+  .sheet-item .tick { color:#2e7d32; font-weight:900; visibility:hidden; }
+  .sheet-item.sel .tick { visibility:visible; }
+  .sheet-item.sel { background:rgba(46,125,50,.07); border-radius:10px; }
   button.sec.armed { background:#2e7d32; border-color:#2e7d32; color:#fff; }
   .hint { font-size:12.5px; color:#78909c; margin-top:9px; line-height:1.8; }
   #msg { min-height:22px; font-size:14px; color:#2e7d32; font-weight:700; margin-top:10px; }
@@ -134,7 +152,7 @@
     <div class="trbox">
     <div class="row">
       <label class="langsel">من
-        <select id="srcLang">
+        <select id="srcLang" style="display:none">
           <option value="ar">العربية</option>
           <option value="en" selected>English</option>
           <option value="ur">الأردية</option>
@@ -147,9 +165,10 @@
           <option value="ru">الروسية</option>
         </select>
       </label>
+      <button type="button" id="srcPick" class="langpick">العربية ▾</button>
       <button id="swapBtn" class="sec" title="تبديل اللغتين">⇄ تبديل</button>
       <label class="langsel">إلى
-        <select id="tgtLang">
+        <select id="tgtLang" style="display:none">
           <option value="ar" selected>العربية</option>
           <option value="en">English</option>
           <option value="ur">الأردية</option>
@@ -162,6 +181,7 @@
           <option value="ru">الروسية</option>
         </select>
       </label>
+      <button type="button" id="tgtPick" class="langpick">English ▾</button>
       <button id="trBtn" class="teal">🌐 ترجم</button>
     </div>
     <div class="trlegend" id="trLegend">الترجمة بكل لغاتها هنا تحتاج اتصالاً بالإنترنت.</div>
@@ -170,8 +190,15 @@
     <div class="row" style="margin-top:12px">
       <button id="copyTransBtn" class="sec">نسخ الترجمة</button>
     </div>
+    <div id="trStatus" class="trstatus" style="display:none"></div>
     <div id="copyMsg" class="hint"></div>
     <p class="hint">القراءة والنسخ يعملان على جهازك دون اتصال (بعد تحميل كل لغة قراءة أول مرة). الترجمة هنا تحتاج اتصالاً — أما داخل التطبيق فتعمل دون اتصال بين العربية والإنجليزية والهندية.</p>
+  </div>
+  <div id="langSheet" class="sheetwrap" style="display:none">
+    <div class="sheet">
+      <div class="sheet-head"><span id="sheetTitle">اختر اللغة</span><button type="button" id="sheetClose" class="sheet-x">✕</button></div>
+      <div id="sheetBody"></div>
+    </div>
   </div>
 </main>
 <footer>
@@ -203,25 +230,70 @@
   var trBtn = document.getElementById('trBtn');
   var swapBtn = document.getElementById('swapBtn');
 
-  // تجميع لغات الترجمة في التطبيق فقط: مجموعة «دون اتصال» منفصلة عن «بالإنترنت فقط»
+  // واجهة اختيار اللغة: لوحة زجاجية منزلقة بمجموعتين (دون اتصال / بالإنترنت فقط)
   var OFFLINE_UI = { ar: 1, en: 1, hi: 1 };
-  function groupLangs(selEl) {
-    if (!window.OFFLINE_TRANSLATE) return;
-    var val = selEl.value, off = [], on = [];
-    Array.prototype.forEach.call(selEl.options, function (o) { (OFFLINE_UI[o.value] ? off : on).push(o); });
-    if (!off.length) return;
-    selEl.innerHTML = '';
-    var g1 = document.createElement('optgroup'); g1.label = 'دون اتصال — داخل الجهاز';
-    var g2 = document.createElement('optgroup'); g2.label = 'بالإنترنت فقط';
-    off.forEach(function (o) { g1.appendChild(o); });
-    on.forEach(function (o) { g2.appendChild(o); });
-    selEl.appendChild(g1); selEl.appendChild(g2);
-    selEl.value = val;
-    var lg = document.getElementById('trLegend');
-    if (lg) lg.textContent = 'لغات مجموعة «دون اتصال» تُترجم داخل جهازك بلا إنترنت، وبقية اللغات تحتاج اتصالاً.';
+  var LANGS = [['ar','العربية'],['en','English'],['ur','الأردية'],['hi','الهندية'],['fa','الفارسية'],['tr','التركية'],['fr','الفرنسية'],['es','الإسبانية'],['de','الألمانية'],['ru','الروسية']];
+  var srcPick = document.getElementById('srcPick');
+  var tgtPick = document.getElementById('tgtPick');
+  var langSheet = document.getElementById('langSheet');
+  var sheetBody = document.getElementById('sheetBody');
+  var sheetTitle = document.getElementById('sheetTitle');
+  var pickTarget = null;
+  function langName(v) { for (var i = 0; i < LANGS.length; i++) if (LANGS[i][0] === v) return LANGS[i][1]; return v; }
+  function refreshPicks() {
+    srcPick.textContent = langName(srcLang.value) + ' ▾';
+    tgtPick.textContent = langName(tgtLang.value) + ' ▾';
   }
-  window.addEventListener('load', function () { groupLangs(srcLang); groupLangs(tgtLang); });
+  function sheetItem(v, cur) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sheet-item' + (v === cur ? ' sel' : '');
+    b.innerHTML = '<span></span><span class="tick">✓</span>';
+    b.firstChild.textContent = langName(v);
+    b.addEventListener('click', function () {
+      if (pickTarget === 'src') srcLang.value = v; else tgtLang.value = v;
+      refreshPicks();
+      closeSheet();
+    });
+    return b;
+  }
+  function openSheet(target) {
+    pickTarget = target;
+    var cur = target === 'src' ? srcLang.value : tgtLang.value;
+    sheetTitle.textContent = target === 'src' ? 'لغة النص الأصلي (من)' : 'لغة الترجمة (إلى)';
+    sheetBody.innerHTML = '';
+    if (window.OFFLINE_TRANSLATE) {
+      var g1 = document.createElement('div'); g1.className = 'sheet-group off'; g1.textContent = 'دون اتصال — داخل الجهاز';
+      var g2 = document.createElement('div'); g2.className = 'sheet-group on'; g2.textContent = 'بالإنترنت فقط';
+      sheetBody.appendChild(g1);
+      LANGS.forEach(function (L) { if (OFFLINE_UI[L[0]]) sheetBody.appendChild(sheetItem(L[0], cur)); });
+      sheetBody.appendChild(g2);
+      LANGS.forEach(function (L) { if (!OFFLINE_UI[L[0]]) sheetBody.appendChild(sheetItem(L[0], cur)); });
+    } else {
+      LANGS.forEach(function (L) { sheetBody.appendChild(sheetItem(L[0], cur)); });
+    }
+    langSheet.style.display = 'flex';
+  }
+  function closeSheet() { langSheet.style.display = 'none'; }
+  srcPick.addEventListener('click', function () { openSheet('src'); });
+  tgtPick.addEventListener('click', function () { openSheet('tgt'); });
+  document.getElementById('sheetClose').addEventListener('click', closeSheet);
+  langSheet.addEventListener('click', function (e) { if (e.target === langSheet) closeSheet(); });
+  window.addEventListener('load', function () {
+    refreshPicks();
+    if (window.OFFLINE_TRANSLATE) {
+      var lg = document.getElementById('trLegend');
+      if (lg) lg.textContent = 'لغات مجموعة «دون اتصال» تُترجم داخل جهازك بلا إنترنت، وبقية اللغات تحتاج اتصالاً.';
+    }
+  });
   var copyMsg = document.getElementById('copyMsg');
+  var trStatus = document.getElementById('trStatus');
+  function setTrStatus(text, kind) {
+    if (!text) { trStatus.style.display = 'none'; return; }
+    trStatus.style.display = 'block';
+    trStatus.className = 'trstatus' + (kind ? ' ' + kind : '');
+    trStatus.textContent = text;
+  }
   var phonesCard = document.getElementById('phonesCard');
   var phonesBox = document.getElementById('phones');
   var langChips = document.getElementById('langChips');
@@ -255,7 +327,7 @@
         clearSelection();
         trBtn.disabled = false;
         transText.value = '';
-        copyMsg.textContent = '';
+        setTrStatus('');
         runBtn.disabled = false;
         setMsg('الصورة جاهزة — حدّد منطقة إن أردت، ثم اضغط «ابدأ النسخ».');
       };
@@ -520,30 +592,30 @@
   // الترجمة: دون اتصال إن توفّر محركها (داخل التطبيق)، وإلا عبر خدمة Google — تحتاج اتصالاً
   function doTranslate() {
     var t = outText.value.trim();
-    if (!t) { copyMsg.textContent = 'لا يوجد نص لترجمته — اقرأ صورة أولاً.'; return; }
+    if (!t) { setTrStatus('لا يوجد نص لترجمته — اقرأ صورة أولاً.', 'err'); return; }
     var src = srcLang.value, tgt = tgtLang.value;
-    if (src === tgt) { transText.value = t; copyMsg.textContent = 'النص بنفس اللغة المختارة — لا حاجة للترجمة.'; return; }
+    if (src === tgt) { transText.value = t; setTrStatus('النص بنفس اللغة المختارة — لا حاجة للترجمة.', 'done'); return; }
     if (window.OFFLINE_TRANSLATE) {
       trBtn.disabled = true;
-      copyMsg.textContent = 'جارٍ الترجمة دون اتصال…';
+      setTrStatus('جارٍ الترجمة دون اتصال…', 'busy');
       window.OFFLINE_TRANSLATE(t, src, tgt,
-        function (res) { transText.value = res; copyMsg.textContent = 'اكتملت الترجمة دون اتصال.'; trBtn.disabled = false; },
+        function (res) { transText.value = res; setTrStatus('اكتملت الترجمة دون اتصال.', 'done'); trBtn.disabled = false; },
         function (why) {
           if (why === 'hung') {
-            copyMsg.textContent = 'علِق محرك الترجمة عند إحدى الجمل فأُعيد تشغيله — جرّب مجدداً، أو احذف السطر المشوّش من النص أولاً.';
+            setTrStatus('علِق محرك الترجمة عند إحدى الجمل فأُعيد تشغيله — جرّب مجدداً، أو احذف السطر المشوّش من النص أولاً.', 'err');
             trBtn.disabled = false;
             return;
           }
           onlineTranslate(t, src, tgt);
         },
-        function (p) { copyMsg.textContent = p; });
+        function (p) { setTrStatus(p, 'busy'); });
       return;
     }
     onlineTranslate(t, src, tgt);
   }
   function onlineTranslate(t, src, tgt) {
     trBtn.disabled = true;
-    copyMsg.textContent = 'جارٍ الترجمة…';
+    setTrStatus('جارٍ الترجمة…', 'busy');
     var chunks = [];
     var rest = t;
     while (rest.length > 1200) {
@@ -568,10 +640,10 @@
     });
     chain.then(function () {
       transText.value = out.join('\n');
-      copyMsg.textContent = 'اكتملت الترجمة.';
+      setTrStatus('اكتملت الترجمة.', 'done');
       trBtn.disabled = false;
     }).catch(function () {
-      copyMsg.textContent = 'تعذّرت الترجمة — هذا الزوج من اللغات يحتاج اتصالاً بالإنترنت.';
+      setTrStatus('تعذّرت الترجمة — هذا الزوج من اللغات يحتاج اتصالاً بالإنترنت.', 'err');
       trBtn.disabled = false;
     });
   }
@@ -580,6 +652,7 @@
     var v = srcLang.value;
     srcLang.value = tgtLang.value;
     tgtLang.value = v;
+    refreshPicks();
   });
 
   copyBtn.addEventListener('click', function () {
@@ -604,7 +677,7 @@
     outText.value = ''; transText.value = '';
     phonesBox.innerHTML = '';
     phonesCard.style.display = 'none';
-    bar.style.display = 'none'; copyMsg.textContent = '';
+    bar.style.display = 'none'; copyMsg.textContent = ''; setTrStatus('');
     runBtn.disabled = true;
     setMsg('');
   });
