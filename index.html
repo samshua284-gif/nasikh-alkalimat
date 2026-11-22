@@ -250,18 +250,19 @@
   }
   function drawSel() {
     if (!sel) { selBox.style.display = 'none'; clearSelBtn.style.display = 'none'; return; }
-    var r = preview.getBoundingClientRect(), w = imgwrap.getBoundingClientRect();
+    // مواضع بالنسبة المئوية من حجم الصورة — لا تتأثر بتمرير الصفحة ولا بتغيّر حجمها
     selBox.style.display = 'block';
-    selBox.style.left = (r.left - w.left + sel.x * r.width) + 'px';
-    selBox.style.top = (r.top - w.top + sel.y * r.height) + 'px';
-    selBox.style.width = (sel.w * r.width) + 'px';
-    selBox.style.height = (sel.h * r.height) + 'px';
+    selBox.style.left = (sel.x * 100) + '%';
+    selBox.style.top = (sel.y * 100) + '%';
+    selBox.style.width = (sel.w * 100) + '%';
+    selBox.style.height = (sel.h * 100) + '%';
     clearSelBtn.style.display = '';
   }
   function clearSelection() { sel = null; drawSel(); }
   preview.addEventListener('pointerdown', function (e) {
     if (!currentImage) return;
     e.preventDefault();
+    try { preview.setPointerCapture(e.pointerId); } catch (err) {}
     dragStart = relPos(e);
     sel = { x: dragStart.x, y: dragStart.y, w: 0, h: 0 };
     drawSel();
@@ -280,6 +281,12 @@
     dragStart = null;
     if (!sel || sel.w < 0.03 || sel.h < 0.03) { clearSelection(); return; }
     setMsg('حُدّدت منطقة — ستُقرأ هي وحدها. «إلغاء التحديد» لقراءة الصورة كاملة.');
+    drawSel();
+  });
+  preview.addEventListener('pointercancel', function () {
+    if (!dragStart) return;
+    dragStart = null;
+    if (!sel || sel.w < 0.03 || sel.h < 0.03) { clearSelection(); return; }
     drawSel();
   });
   clearSelBtn.addEventListener('click', function () { clearSelection(); setMsg('أُلغي التحديد — ستُقرأ الصورة كاملة.'); });

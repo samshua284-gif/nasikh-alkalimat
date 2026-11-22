@@ -1,4 +1,4 @@
-var CACHE = "ocr-v5";
+var CACHE = "ocr-v6";
 var ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg"];
 self.addEventListener("install", function(e){
   e.waitUntil(caches.open(CACHE).then(function(c){ return c.addAll(ASSETS); }).then(function(){ return self.skipWaiting(); }));
