@@ -42,13 +42,16 @@
     font:inherit; font-weight:600; padding:10px 12px; border:1.5px solid #b0bec5; border-radius:10px;
     background:#fff; color:#263238;
   }
+  .trbox { border:1.5px solid #b0bec5; border-radius:14px; padding:12px; background:#f7faf8; margin-top:12px; }
+  .trlegend { font-size:12px; color:#78909c; margin-top:9px; line-height:1.8; }
+  button.sec.armed { background:#2e7d32; border-color:#2e7d32; color:#fff; }
   .hint { font-size:12.5px; color:#78909c; margin-top:9px; line-height:1.8; }
   #msg { min-height:22px; font-size:14px; color:#2e7d32; font-weight:700; margin-top:10px; }
   #msg.err { color:#c62828; }
   .bar { height:10px; background:#eceff1; border-radius:6px; overflow:hidden; margin-top:10px; display:none; }
   .bar i { display:block; height:100%; width:0; background:#2e7d32; transition:width .2s; }
   .imgwrap { position:relative; display:none; margin-top:12px; }
-  #preview { max-width:100%; border:1px solid #cfd8dc; border-radius:10px; display:block; touch-action:none; }
+  #preview { max-width:100%; border:1px solid #cfd8dc; border-radius:10px; display:block; touch-action:pan-y; }
   #selBox {
     position:absolute; border:2px dashed #2e7d32; background:rgba(46,125,50,.16);
     border-radius:4px; display:none; pointer-events:none;
@@ -81,6 +84,7 @@
       <label class="btn" for="filePick" style="margin:0">📷 اختر صورة</label>
       <label class="btn sec" for="camPick" style="margin:0">📸 التقط صورة</label>
       <button id="clearSelBtn" class="sec" style="display:none">إلغاء التحديد</button>
+      <button id="selModeBtn" class="sec" style="display:none">✂️ تحديد منطقة</button>
     </div>
     <input type="file" id="filePick" accept="image/*" hidden>
     <input type="file" id="camPick" accept="image/*" capture="environment" hidden>
@@ -88,7 +92,7 @@
       <img id="preview" alt="معاينة الصورة">
       <div id="selBox"></div>
     </div>
-    <p class="hint">اسحب إصبعك أو الفأرة فوق جزء من الصورة لتحديده — تُقرأ المنطقة المحددة فقط. بلا تحديد تُقرأ الصورة كاملة. يمكنك أيضاً لصق صورة منسوخة (Ctrl+V).</p>
+    <p class="hint">اضغط «تحديد منطقة» ثم اسحب فوق الجزء المطلوب — تُقرأ المنطقة المحددة فقط. بعد اكتمال التحديد مرّر الصفحة بحرية، فالمربع ثابت على الصورة ولن يختفي. بلا تحديد تُقرأ الصورة كاملة. يمكنك أيضاً لصق صورة منسوخة (Ctrl+V).</p>
   </div>
 
   <div class="card">
@@ -127,7 +131,8 @@
       <button id="copyBtn">📋 نسخ النص كاملاً</button>
       <button id="copyPhonesBtn" class="sec">نسخ الأرقام فقط</button>
     </div>
-    <div class="row" style="margin-top:12px">
+    <div class="trbox">
+    <div class="row">
       <label class="langsel">من
         <select id="srcLang">
           <option value="ar">العربية</option>
@@ -159,12 +164,14 @@
       </label>
       <button id="trBtn" class="teal">🌐 ترجم</button>
     </div>
+    <div class="trlegend" id="trLegend">الترجمة بكل لغاتها هنا تحتاج اتصالاً بالإنترنت.</div>
+    </div>
     <textarea id="transText" placeholder="الترجمة تظهر هنا." dir="auto" style="margin-top:12px"></textarea>
     <div class="row" style="margin-top:12px">
       <button id="copyTransBtn" class="sec">نسخ الترجمة</button>
     </div>
     <div id="copyMsg" class="hint"></div>
-    <p class="hint">القراءة والنسخ يعملان على جهازك دون اتصال (بعد تحميل كل لغة قراءة أول مرة). الترجمة هنا تحتاج اتصالاً — أما داخل التطبيق فتعمل دون اتصال بين العربية والإنجليزية والهندية والأردية.</p>
+    <p class="hint">القراءة والنسخ يعملان على جهازك دون اتصال (بعد تحميل كل لغة قراءة أول مرة). الترجمة هنا تحتاج اتصالاً — أما داخل التطبيق فتعمل دون اتصال بين العربية والإنجليزية والهندية.</p>
   </div>
 </main>
 <footer>
@@ -179,6 +186,7 @@
   var runBtn = document.getElementById('runBtn');
   var clearBtn = document.getElementById('clearBtn');
   var clearSelBtn = document.getElementById('clearSelBtn');
+  var selModeBtn = document.getElementById('selModeBtn');
   var imgwrap = document.getElementById('imgwrap');
   var preview = document.getElementById('preview');
   var selBox = document.getElementById('selBox');
@@ -194,6 +202,25 @@
   var tgtLang = document.getElementById('tgtLang');
   var trBtn = document.getElementById('trBtn');
   var swapBtn = document.getElementById('swapBtn');
+
+  // تجميع لغات الترجمة في التطبيق فقط: مجموعة «دون اتصال» منفصلة عن «بالإنترنت فقط»
+  var OFFLINE_UI = { ar: 1, en: 1, hi: 1 };
+  function groupLangs(selEl) {
+    if (!window.OFFLINE_TRANSLATE) return;
+    var val = selEl.value, off = [], on = [];
+    Array.prototype.forEach.call(selEl.options, function (o) { (OFFLINE_UI[o.value] ? off : on).push(o); });
+    if (!off.length) return;
+    selEl.innerHTML = '';
+    var g1 = document.createElement('optgroup'); g1.label = 'دون اتصال — داخل الجهاز';
+    var g2 = document.createElement('optgroup'); g2.label = 'بالإنترنت فقط';
+    off.forEach(function (o) { g1.appendChild(o); });
+    on.forEach(function (o) { g2.appendChild(o); });
+    selEl.appendChild(g1); selEl.appendChild(g2);
+    selEl.value = val;
+    var lg = document.getElementById('trLegend');
+    if (lg) lg.textContent = 'لغات مجموعة «دون اتصال» تُترجم داخل جهازك بلا إنترنت، وبقية اللغات تحتاج اتصالاً.';
+  }
+  window.addEventListener('load', function () { groupLangs(srcLang); groupLangs(tgtLang); });
   var copyMsg = document.getElementById('copyMsg');
   var phonesCard = document.getElementById('phonesCard');
   var phonesBox = document.getElementById('phones');
@@ -202,6 +229,8 @@
   var currentPhones = [];    // normalized digit strings
   var sel = null;            // {x,y,w,h} كسور من أبعاد العرض
   var dragStart = null;
+  var selecting = false;   // وضع التحديد مفعّل بزر «تحديد منطقة» فقط — كي لا يمسح تمريرُ الصفحة التحديدَ
+  var prevSel = null;
 
   function setMsg(t, isErr) {
     msg.textContent = t || '';
@@ -222,6 +251,7 @@
         currentImage = img;
         preview.src = e.target.result;
         imgwrap.style.display = 'inline-block';
+        selModeBtn.style.display = '';
         clearSelection();
         runBtn.disabled = false;
         setMsg('الصورة جاهزة — حدّد منطقة إن أردت، ثم اضغط «ابدأ النسخ».');
@@ -258,11 +288,26 @@
     selBox.style.height = (sel.h * 100) + '%';
     clearSelBtn.style.display = '';
   }
-  function clearSelection() { sel = null; drawSel(); }
+  function disarmSel() {
+    selecting = false;
+    selModeBtn.classList.remove('armed');
+    selModeBtn.textContent = '✂️ تحديد منطقة';
+    preview.style.touchAction = 'pan-y';
+  }
+  function clearSelection() { sel = null; disarmSel(); drawSel(); }
+  selModeBtn.addEventListener('click', function () {
+    if (selecting) { disarmSel(); return; }
+    selecting = true;
+    selModeBtn.classList.add('armed');
+    selModeBtn.textContent = '✋ اسحب الآن على الصورة…';
+    preview.style.touchAction = 'none';
+    setMsg('وضع التحديد مفعّل — اسحب إصبعك فوق الجزء المطلوب من الصورة.');
+  });
   preview.addEventListener('pointerdown', function (e) {
-    if (!currentImage) return;
+    if (!currentImage || !selecting) return;
     e.preventDefault();
     try { preview.setPointerCapture(e.pointerId); } catch (err) {}
+    prevSel = sel;
     dragStart = relPos(e);
     sel = { x: dragStart.x, y: dragStart.y, w: 0, h: 0 };
     drawSel();
@@ -279,14 +324,18 @@
   preview.addEventListener('pointerup', function () {
     if (!dragStart) return;
     dragStart = null;
-    if (!sel || sel.w < 0.03 || sel.h < 0.03) { clearSelection(); return; }
-    setMsg('حُدّدت منطقة — ستُقرأ هي وحدها. «إلغاء التحديد» لقراءة الصورة كاملة.');
+    if (!sel || sel.w < 0.03 || sel.h < 0.03) { sel = prevSel; }
+    else { setMsg('حُدّدت منطقة — ستُقرأ هي وحدها. يمكنك تمرير الصفحة الآن بحرية، و«إلغاء التحديد» لقراءة الصورة كاملة.'); }
+    prevSel = null;
+    disarmSel();
     drawSel();
   });
   preview.addEventListener('pointercancel', function () {
     if (!dragStart) return;
     dragStart = null;
-    if (!sel || sel.w < 0.03 || sel.h < 0.03) { clearSelection(); return; }
+    sel = prevSel;
+    prevSel = null;
+    disarmSel();
     drawSel();
   });
   clearSelBtn.addEventListener('click', function () { clearSelection(); setMsg('أُلغي التحديد — ستُقرأ الصورة كاملة.'); });
