@@ -253,6 +253,9 @@
         imgwrap.style.display = 'inline-block';
         selModeBtn.style.display = '';
         clearSelection();
+        trBtn.disabled = false;
+        transText.value = '';
+        copyMsg.textContent = '';
         runBtn.disabled = false;
         setMsg('الصورة جاهزة — حدّد منطقة إن أردت، ثم اضغط «ابدأ النسخ».');
       };
@@ -525,7 +528,14 @@
       copyMsg.textContent = 'جارٍ الترجمة دون اتصال…';
       window.OFFLINE_TRANSLATE(t, src, tgt,
         function (res) { transText.value = res; copyMsg.textContent = 'اكتملت الترجمة دون اتصال.'; trBtn.disabled = false; },
-        function () { onlineTranslate(t, src, tgt); },
+        function (why) {
+          if (why === 'hung') {
+            copyMsg.textContent = 'علِق محرك الترجمة عند إحدى الجمل فأُعيد تشغيله — جرّب مجدداً، أو احذف السطر المشوّش من النص أولاً.';
+            trBtn.disabled = false;
+            return;
+          }
+          onlineTranslate(t, src, tgt);
+        },
         function (p) { copyMsg.textContent = p; });
       return;
     }
