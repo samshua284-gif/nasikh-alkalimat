@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="only light">
+<title>ناسخ الكلمات من الصور — انسخ النص وأرقام الهواتف</title>
+<meta name="description" content="أداة تقرأ النص من الصور ولقطات الشاشة بلغات كثيرة، وتستخرج أرقام الهواتف، وتترجم بين العربية والإنجليزية — القراءة تجري على جهازك.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:"Segoe UI", Tahoma, Arial, sans-serif; background:#eef3f1; color:#263238; }
+  header {
+    background:linear-gradient(135deg, #1b5e20 0%, #2e7d32 55%, #00897b 100%);
+    color:#fff; padding:22px 16px 18px; text-align:center;
+  }
+  header h1 { margin:0 0 5px; font-size:25px; }
+  header p { margin:0; opacity:.92; font-size:13.5px; line-height:1.8; }
+  main { max-width:880px; margin:0 auto; padding:16px 14px 40px; }
+  .card { background:#fff; border:1px solid #d7e0da; border-radius:14px; padding:16px; margin-bottom:14px; box-shadow:0 2px 8px rgba(27,94,32,.06); }
+  .card h2 { margin:0 0 12px; font-size:17px; color:#1b5e20; display:flex; align-items:center; gap:9px; }
+  .step {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:26px; height:26px; border-radius:50%; background:#2e7d32; color:#fff; font-size:14px; flex:0 0 auto;
+  }
+  .row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  button, .btn {
+    font:inherit; cursor:pointer; border:0; border-radius:10px; padding:11px 18px;
+    background:#2e7d32; color:#fff; font-weight:700; display:inline-block; text-align:center;
+  }
+  button.sec, .btn.sec { background:#eceff1; color:#37474f; border:1px solid #b0bec5; }
+  button.teal { background:#00897b; }
+  button:disabled { opacity:.5; cursor:default; }
+  textarea {
+    width:100%; font:inherit; padding:11px; border:1px solid #b0bec5; border-radius:10px; background:#fff;
+    min-height:140px; resize:vertical; line-height:1.9;
+  }
+  .hint { font-size:12.5px; color:#78909c; margin-top:9px; line-height:1.8; }
+  #msg { min-height:22px; font-size:14px; color:#2e7d32; font-weight:700; margin-top:10px; }
+  #msg.err { color:#c62828; }
+  .bar { height:10px; background:#eceff1; border-radius:6px; overflow:hidden; margin-top:10px; display:none; }
+  .bar i { display:block; height:100%; width:0; background:#2e7d32; transition:width .2s; }
+  .imgwrap { position:relative; display:none; margin-top:12px; }
+  #preview { max-width:100%; border:1px solid #cfd8dc; border-radius:10px; display:block; touch-action:none; }
+  #selBox {
+    position:absolute; border:2px dashed #2e7d32; background:rgba(46,125,50,.16);
+    border-radius:4px; display:none; pointer-events:none;
+  }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { position:relative; }
+  .chip input { position:absolute; opacity:0; inset:0; cursor:pointer; }
+  .chip span {
+    display:inline-block; padding:8px 15px; border-radius:20px; border:1.5px solid #b0bec5;
+    background:#fff; color:#37474f; font-size:14px; font-weight:600;
+  }
+  .chip input:checked + span { background:#2e7d32; border-color:#2e7d32; color:#fff; }
+  .phone { display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:#f4f8f5; border:1px solid #d7e0da; border-radius:10px; padding:10px 12px; margin-bottom:8px; }
+  .phone b { font-size:19px; direction:ltr; unicode-bidi:plaintext; letter-spacing:1px; }
+  .phone button, .phone a.btn { padding:7px 13px; font-size:13.5px; }
+  .phone a.btn { background:#1565c0; text-decoration:none; }
+  .empty-note { color:#90a4ae; text-align:center; padding:14px 0 4px; }
+  footer { text-align:center; color:#90a4ae; font-size:12.5px; padding:0 16px 26px; line-height:1.9; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📄 ناسخ الكلمات من الصور</h1>
+  <p>صوّر إعلانًا أو لقطة شاشة — يُقرأ النص، تُستخرج أرقام الهواتف، ويُترجم بين العربية والإنجليزية.</p>
+</header>
+<main>
+  <div class="card">
+    <h2><span class="step">١</span> اختر الصورة وحدّد المنطقة</h2>
+    <div class="row">
+      <label class="btn" for="filePick" style="margin:0">📷 اختر صورة</label>
+      <label class="btn sec" for="camPick" style="margin:0">📸 التقط صورة</label>
+      <button id="clearSelBtn" class="sec" style="display:none">إلغاء التحديد</button>
+    </div>
+    <input type="file" id="filePick" accept="image/*" hidden>
+    <input type="file" id="camPick" accept="image/*" capture="environment" hidden>
+    <div class="imgwrap" id="imgwrap">
+      <img id="preview" alt="معاينة الصورة">
+      <div id="selBox"></div>
+    </div>
+    <p class="hint">اسحب إصبعك أو الفأرة فوق جزء من الصورة لتحديده — تُقرأ المنطقة المحددة فقط. بلا تحديد تُقرأ الصورة كاملة. يمكنك أيضاً لصق صورة منسوخة (Ctrl+V).</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">٢</span> لغة النص في الصورة</h2>
+    <div class="chips" id="langChips">
+      <label class="chip"><input type="checkbox" value="ara" checked><span>العربية</span></label>
+      <label class="chip"><input type="checkbox" value="eng" checked><span>English</span></label>
+      <label class="chip"><input type="checkbox" value="urd"><span>الأردية</span></label>
+      <label class="chip"><input type="checkbox" value="hin"><span>الهندية</span></label>
+      <label class="chip"><input type="checkbox" value="fas"><span>الفارسية</span></label>
+      <label class="chip"><input type="checkbox" value="tur"><span>التركية</span></label>
+      <label class="chip"><input type="checkbox" value="fra"><span>الفرنسية</span></label>
+      <label class="chip"><input type="checkbox" value="spa"><span>الإسبانية</span></label>
+      <label class="chip"><input type="checkbox" value="deu"><span>الألمانية</span></label>
+      <label class="chip"><input type="checkbox" value="rus"><span>الروسية</span></label>
+    </div>
+    <p class="hint">كل لغة جديدة تُحمَّل مرة واحدة (~٢-٣ ميغا) ثم تُحفظ في جهازك وتعمل بعدها دون اتصال. اختر لغات الصورة فقط — الزيادة تبطئ القراءة.</p>
+    <div class="row" style="margin-top:12px">
+      <button id="runBtn" disabled>🔍 ابدأ النسخ</button>
+      <button id="clearBtn" class="sec">مسح الكل</button>
+    </div>
+    <div class="bar" id="bar"><i id="barFill"></i></div>
+    <div id="msg"></div>
+  </div>
+
+  <div class="card" id="phonesCard" style="display:none">
+    <h2>📞 أرقام الهواتف في الصورة</h2>
+    <div id="phones"></div>
+    <p class="hint">الأرقام العُمانية (٨ أرقام تبدأ بـ ٧ أو ٩، مع مفتاح 968 أو بدونه) تظهر أولاً. إن ظهر رقم ناقصاً أو زائداً، صحّحه من النص الكامل أدناه.</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">٣</span> النص المقروء والترجمة</h2>
+    <textarea id="outText" placeholder="النص المقروء من الصورة يظهر هنا — ويمكنك تعديله قبل النسخ أو الترجمة." dir="auto"></textarea>
+    <div class="row" style="margin-top:12px">
+      <button id="copyBtn">📋 نسخ النص كاملاً</button>
+      <button id="copyPhonesBtn" class="sec">نسخ الأرقام فقط</button>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button id="trArBtn" class="teal">🌐 ترجم إلى العربية</button>
+      <button id="trEnBtn" class="teal">🌐 ترجم إلى الإنجليزية</button>
+    </div>
+    <textarea id="transText" placeholder="الترجمة تظهر هنا." dir="auto" style="margin-top:12px"></textarea>
+    <div class="row" style="margin-top:12px">
+      <button id="copyTransBtn" class="sec">نسخ الترجمة</button>
+    </div>
+    <div id="copyMsg" class="hint"></div>
+    <p class="hint">القراءة والنسخ يعملان على جهازك دون اتصال (بعد تحميل كل لغة أول مرة). الترجمة وحدها تحتاج اتصالاً بالإنترنت.</p>
+  </div>
+</main>
+<footer>
+  ناسخ الكلمات من الصور © هلال سمير<br>
+  يعمل بمحرك Tesseract مفتوح المصدر — القراءة على جهازك، ولا يُحفظ أي نص خارج هاتفك.
+</footer>
+
+<script>
+(function () {
+  var filePick = document.getElementById('filePick');
+  var camPick = document.getElementById('camPick');
+  var runBtn = document.getElementById('runBtn');
+  var clearBtn = document.getElementById('clearBtn');
+  var clearSelBtn = document.getElementById('clearSelBtn');
+  var imgwrap = document.getElementById('imgwrap');
+  var preview = document.getElementById('preview');
+  var selBox = document.getElementById('selBox');
+  var bar = document.getElementById('bar');
+  var barFill = document.getElementById('barFill');
+  var msg = document.getElementById('msg');
+  var outText = document.getElementById('outText');
+  var transText = document.getElementById('transText');
+  var copyBtn = document.getElementById('copyBtn');
+  var copyPhonesBtn = document.getElementById('copyPhonesBtn');
+  var copyTransBtn = document.getElementById('copyTransBtn');
+  var trArBtn = document.getElementById('trArBtn');
+  var trEnBtn = document.getElementById('trEnBtn');
+  var copyMsg = document.getElementById('copyMsg');
+  var phonesCard = document.getElementById('phonesCard');
+  var phonesBox = document.getElementById('phones');
+  var langChips = document.getElementById('langChips');
+  var currentImage = null;   // HTMLImageElement
+  var currentPhones = [];    // normalized digit strings
+  var sel = null;            // {x,y,w,h} كسور من أبعاد العرض
+  var dragStart = null;
+
+  function setMsg(t, isErr) {
+    msg.textContent = t || '';
+    msg.className = isErr ? 'err' : '';
+  }
+  function setProgress(p, label) {
+    bar.style.display = 'block';
+    barFill.style.width = Math.round(p * 100) + '%';
+    setMsg(label || '');
+  }
+
+  function loadFile(file) {
+    if (!file || file.type.indexOf('image/') !== 0) { setMsg('اختر ملف صورة (JPG أو PNG).', true); return; }
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var img = new Image();
+      img.onload = function () {
+        currentImage = img;
+        preview.src = e.target.result;
+        imgwrap.style.display = 'inline-block';
+        clearSelection();
+        runBtn.disabled = false;
+        setMsg('الصورة جاهزة — حدّد منطقة إن أردت، ثم اضغط «ابدأ النسخ».');
+      };
+      img.onerror = function () { setMsg('تعذّر فتح هذه الصورة — جرّب صورة أخرى.', true); };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+  filePick.addEventListener('change', function () { loadFile(filePick.files[0]); filePick.value = ''; });
+  camPick.addEventListener('change', function () { loadFile(camPick.files[0]); camPick.value = ''; });
+  document.addEventListener('paste', function (e) {
+    var items = (e.clipboardData || window.clipboardData).items;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image/') === 0) { loadFile(items[i].getAsFile()); return; }
+    }
+  });
+
+  // تحديد منطقة بالسحب فوق المعاينة — تُحفظ كسوراً لتقاوم تغيّر حجم العرض
+  function relPos(e) {
+    var r = preview.getBoundingClientRect();
+    return {
+      x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
+      y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))
+    };
+  }
+  function drawSel() {
+    if (!sel) { selBox.style.display = 'none'; clearSelBtn.style.display = 'none'; return; }
+    var r = preview.getBoundingClientRect(), w = imgwrap.getBoundingClientRect();
+    selBox.style.display = 'block';
+    selBox.style.left = (r.left - w.left + sel.x * r.width) + 'px';
+    selBox.style.top = (r.top - w.top + sel.y * r.height) + 'px';
+    selBox.style.width = (sel.w * r.width) + 'px';
+    selBox.style.height = (sel.h * r.height) + 'px';
+    clearSelBtn.style.display = '';
+  }
+  function clearSelection() { sel = null; drawSel(); }
+  preview.addEventListener('pointerdown', function (e) {
+    if (!currentImage) return;
+    e.preventDefault();
+    dragStart = relPos(e);
+    sel = { x: dragStart.x, y: dragStart.y, w: 0, h: 0 };
+    drawSel();
+  });
+  preview.addEventListener('pointermove', function (e) {
+    if (!dragStart) return;
+    var p = relPos(e);
+    sel = {
+      x: Math.min(dragStart.x, p.x), y: Math.min(dragStart.y, p.y),
+      w: Math.abs(p.x - dragStart.x), h: Math.abs(p.y - dragStart.y)
+    };
+    drawSel();
+  });
+  preview.addEventListener('pointerup', function () {
+    if (!dragStart) return;
+    dragStart = null;
+    if (!sel || sel.w < 0.03 || sel.h < 0.03) { clearSelection(); return; }
+    setMsg('حُدّدت منطقة — ستُقرأ هي وحدها. «إلغاء التحديد» لقراءة الصورة كاملة.');
+    drawSel();
+  });
+  clearSelBtn.addEventListener('click', function () { clearSelection(); setMsg('أُلغي التحديد — ستُقرأ الصورة كاملة.'); });
+  window.addEventListener('resize', drawSel);
+
+  function getLangs() {
+    var boxes = langChips.querySelectorAll('input:checked');
+    var vals = [];
+    boxes.forEach(function (b) { vals.push(b.value); });
+    return vals.length ? vals.join('+') : 'ara+eng';
+  }
+
+  // مصدر القراءة: المنطقة المحددة مقصوصة بدقتها الأصلية، أو الصورة كاملة
+  function sourceCanvas() {
+    var img = currentImage;
+    var c = document.createElement('canvas');
+    if (sel) {
+      c.width = Math.max(2, Math.round(sel.w * img.naturalWidth));
+      c.height = Math.max(2, Math.round(sel.h * img.naturalHeight));
+      c.getContext('2d').drawImage(img,
+        Math.round(sel.x * img.naturalWidth), Math.round(sel.y * img.naturalHeight), c.width, c.height,
+        0, 0, c.width, c.height);
+    } else {
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      c.getContext('2d').drawImage(img, 0, 0);
+    }
+    return c;
+  }
+
+  // تحسين قبل القراءة: تكبير + رمادي + تباين — يرفع دقة قراءة الأرقام من لقطات الشاشة.
+  function prepareCanvas(src) {
+    var scale = Math.max(1, 1600 / Math.max(src.width, src.height));
+    var w = Math.round(src.width * scale);
+    var h = Math.round(src.height * scale);
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(src, 0, 0, w, h);
+    var d = ctx.getImageData(0, 0, w, h);
+    var px = d.data;
+    for (var i = 0; i < px.length; i += 4) {
+      var g = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+      g = g < 200 ? Math.max(0, (g - 40) * 1.35) : Math.min(255, 190 + (g - 200) * 1.2);
+      px[i] = px[i + 1] = px[i + 2] = g;
+    }
+    ctx.putImageData(d, 0, 0);
+    return c;
+  }
+
+  function arabicToWestern(s) {
+    return s.replace(/[٠-٩]/g, function (ch) { return String('٠١٢٣٤٥٦٧٨٩'.indexOf(ch)); })
+            .replace(/[۰-۹]/g, function (ch) { return String('۰۱۲۳۴۵۶۷۸۹'.indexOf(ch)); });
+  }
+
+  function extractPhones(text) {
+    var t = arabicToWestern(text).replace(/[‐‑‒–—―]/g, '-');
+    var found = [];
+    var seen = {};
+    var re = /(?:\+?\s*968[\s\-]?)?([79]\d{7})/g;
+    var m;
+    while ((m = re.exec(t)) !== null) {
+      var n = m[1];
+      if (!seen[n]) { seen[n] = true; found.push(n); }
+    }
+    var reSplit = /(?:\+?\s*968[\s\-]?)?([79]\d{3})[\s\-](\d{4})\b/g;
+    while ((m = reSplit.exec(t)) !== null) {
+      var nS = m[1] + m[2];
+      if (!seen[nS]) { seen[nS] = true; found.push(nS); }
+    }
+    var re2 = /\b(\d{8})\b/g;
+    while ((m = re2.exec(t)) !== null) {
+      var n2 = m[1];
+      if (!seen[n2]) { seen[n2] = true; found.push(n2); }
+    }
+    return found;
+  }
+
+  function renderPhones(list) {
+    currentPhones = list;
+    phonesBox.innerHTML = '';
+    if (!list.length) { phonesCard.style.display = 'none'; return; }
+    phonesCard.style.display = 'block';
+    list.forEach(function (n) {
+      var row = document.createElement('div');
+      row.className = 'phone';
+      var b = document.createElement('b');
+      b.textContent = n;
+      var copy = document.createElement('button');
+      copy.textContent = 'نسخ';
+      copy.addEventListener('click', function () { copyText(n, 'تم نسخ الرقم ' + n); });
+      var call = document.createElement('a');
+      call.className = 'btn';
+      call.href = 'tel:+968' + n;
+      call.textContent = 'اتصال';
+      row.appendChild(b);
+      row.appendChild(copy);
+      row.appendChild(call);
+      phonesBox.appendChild(row);
+    });
+  }
+
+  function copyText(text, okMsg) {
+    function done() { copyMsg.textContent = okMsg; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); });
+    } else { fallbackCopy(text); done(); }
+  }
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  runBtn.addEventListener('click', function () {
+    if (!currentImage) return;
+    if (typeof Tesseract === 'undefined') {
+      setMsg('محرك القراءة لم يُحمّل بعد — تأكد من اتصال الإنترنت ثم أعد فتح الصفحة.', true);
+      return;
+    }
+    runBtn.disabled = true;
+    setProgress(0, 'جارٍ تجهيز الصورة…');
+    var canvas;
+    try { canvas = prepareCanvas(sourceCanvas()); }
+    catch (e) { canvas = currentImage; }
+    Tesseract.recognize(canvas, getLangs(), {
+      logger: function (m) {
+        if (m.status === 'recognizing text') setProgress(m.progress, 'جارٍ قراءة النص… ' + Math.round(m.progress * 100) + '%');
+        else if (m.status) setProgress(m.progress || 0, 'جارٍ تحميل محرك القراءة ولغاته…');
+      }
+    }).then(function (res) {
+      var text = (res.data.text || '').replace(/\n{3,}/g, '\n\n').trim();
+      outText.value = text;
+      renderPhones(extractPhones(text));
+      bar.style.display = 'none';
+      if (text) {
+        setMsg(currentPhones.length
+          ? 'اكتملت القراءة — وُجد ' + currentPhones.length + ' رقم هاتف. راجع النص قبل النسخ.'
+          : 'اكتملت القراءة — لم يُعثر على رقم هاتف، لكن النص كاملاً أدناه.');
+      } else {
+        setMsg('لم يُقرأ أي نص — جرّب صورة أوضح أو أقرب، أو حدّد المنطقة بدقة، أو غيّر اللغة.', true);
+      }
+      runBtn.disabled = false;
+    }).catch(function () {
+      bar.style.display = 'none';
+      setMsg('تعذّرت القراءة — إن كانت لغة جديدة فأول تحميل لها يحتاج إنترنت؛ حاول مرة أخرى.', true);
+      runBtn.disabled = false;
+    });
+  });
+
+  // الترجمة عبر خدمة Google المجانية — تحتاج اتصالاً
+  function translateTo(tl, btn) {
+    var t = outText.value.trim();
+    if (!t) { copyMsg.textContent = 'لا يوجد نص لترجمته — اقرأ صورة أولاً.'; return; }
+    btn.disabled = true;
+    copyMsg.textContent = 'جارٍ الترجمة…';
+    var chunks = [];
+    var rest = t;
+    while (rest.length > 1200) {
+      var cut = rest.lastIndexOf('\n', 1200);
+      if (cut < 400) cut = rest.lastIndexOf(' ', 1200);
+      if (cut < 400) cut = 1200;
+      chunks.push(rest.slice(0, cut));
+      rest = rest.slice(cut);
+    }
+    chunks.push(rest);
+    var out = [];
+    var chain = Promise.resolve();
+    chunks.forEach(function (ch) {
+      chain = chain.then(function () {
+        var url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=' + tl + '&dt=t&q=' + encodeURIComponent(ch);
+        return fetch(url).then(function (r) { return r.json(); }).then(function (j) {
+          var s = '';
+          (j[0] || []).forEach(function (seg) { if (seg[0]) s += seg[0]; });
+          out.push(s);
+        });
+      });
+    });
+    chain.then(function () {
+      transText.value = out.join('\n');
+      copyMsg.textContent = 'اكتملت الترجمة.';
+      btn.disabled = false;
+    }).catch(function () {
+      copyMsg.textContent = 'تعذّرت الترجمة — الترجمة تحتاج اتصالاً بالإنترنت.';
+      btn.disabled = false;
+    });
+  }
+  trArBtn.addEventListener('click', function () { translateTo('ar', trArBtn); });
+  trEnBtn.addEventListener('click', function () { translateTo('en', trEnBtn); });
+
+  copyBtn.addEventListener('click', function () {
+    var t = outText.value.trim();
+    if (!t) { copyMsg.textContent = 'لا يوجد نص لنسخه بعد — اقرأ صورة أولاً.'; return; }
+    copyText(t, 'تم نسخ النص كاملاً.');
+  });
+  copyPhonesBtn.addEventListener('click', function () {
+    if (!currentPhones.length) { copyMsg.textContent = 'لا توجد أرقام لنسخها.'; return; }
+    copyText(currentPhones.join('\n'), 'تم نسخ ' + currentPhones.length + ' رقم.');
+  });
+  copyTransBtn.addEventListener('click', function () {
+    var t = transText.value.trim();
+    if (!t) { copyMsg.textContent = 'لا توجد ترجمة لنسخها بعد.'; return; }
+    copyText(t, 'تم نسخ الترجمة.');
+  });
+
+  clearBtn.addEventListener('click', function () {
+    currentImage = null; currentPhones = [];
+    imgwrap.style.display = 'none'; preview.src = '';
+    clearSelection();
+    outText.value = ''; transText.value = '';
+    phonesBox.innerHTML = '';
+    phonesCard.style.display = 'none';
+    bar.style.display = 'none'; copyMsg.textContent = '';
+    runBtn.disabled = true;
+    setMsg('');
+  });
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('./sw.js').catch(function () {});
+    });
+  }
+})();
+</script>
+</body>
+</html>
