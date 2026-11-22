@@ -252,6 +252,7 @@
     b.firstChild.textContent = langName(v);
     b.addEventListener('click', function () {
       if (pickTarget === 'src') srcLang.value = v; else tgtLang.value = v;
+      transText.value = '';
       refreshPicks();
       closeSheet();
     });
@@ -595,6 +596,7 @@
     if (!t) { setTrStatus('لا يوجد نص لترجمته — اقرأ صورة أولاً.', 'err'); return; }
     var src = srcLang.value, tgt = tgtLang.value;
     if (src === tgt) { transText.value = t; setTrStatus('النص بنفس اللغة المختارة — لا حاجة للترجمة.', 'done'); return; }
+    transText.value = '';
     if (window.OFFLINE_TRANSLATE) {
       trBtn.disabled = true;
       setTrStatus('جارٍ الترجمة دون اتصال…', 'busy');
@@ -652,6 +654,7 @@
     var v = srcLang.value;
     srcLang.value = tgtLang.value;
     tgtLang.value = v;
+    transText.value = '';
     refreshPicks();
   });
 
