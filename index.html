@@ -37,6 +37,11 @@
     width:100%; font:inherit; padding:11px; border:1px solid #b0bec5; border-radius:10px; background:#fff;
     min-height:140px; resize:vertical; line-height:1.9;
   }
+  .langsel { font-weight:700; color:#37474f; display:inline-flex; align-items:center; gap:7px; }
+  .langsel select {
+    font:inherit; font-weight:600; padding:10px 12px; border:1.5px solid #b0bec5; border-radius:10px;
+    background:#fff; color:#263238;
+  }
   .hint { font-size:12.5px; color:#78909c; margin-top:9px; line-height:1.8; }
   #msg { min-height:22px; font-size:14px; color:#2e7d32; font-weight:700; margin-top:10px; }
   #msg.err { color:#c62828; }
@@ -123,15 +128,43 @@
       <button id="copyPhonesBtn" class="sec">نسخ الأرقام فقط</button>
     </div>
     <div class="row" style="margin-top:12px">
-      <button id="trArBtn" class="teal">🌐 ترجم إلى العربية</button>
-      <button id="trEnBtn" class="teal">🌐 ترجم إلى الإنجليزية</button>
+      <label class="langsel">من
+        <select id="srcLang">
+          <option value="ar">العربية</option>
+          <option value="en" selected>English</option>
+          <option value="ur">الأردية</option>
+          <option value="hi">الهندية</option>
+          <option value="fa">الفارسية</option>
+          <option value="tr">التركية</option>
+          <option value="fr">الفرنسية</option>
+          <option value="es">الإسبانية</option>
+          <option value="de">الألمانية</option>
+          <option value="ru">الروسية</option>
+        </select>
+      </label>
+      <button id="swapBtn" class="sec" title="تبديل اللغتين">⇄ تبديل</button>
+      <label class="langsel">إلى
+        <select id="tgtLang">
+          <option value="ar" selected>العربية</option>
+          <option value="en">English</option>
+          <option value="ur">الأردية</option>
+          <option value="hi">الهندية</option>
+          <option value="fa">الفارسية</option>
+          <option value="tr">التركية</option>
+          <option value="fr">الفرنسية</option>
+          <option value="es">الإسبانية</option>
+          <option value="de">الألمانية</option>
+          <option value="ru">الروسية</option>
+        </select>
+      </label>
+      <button id="trBtn" class="teal">🌐 ترجم</button>
     </div>
     <textarea id="transText" placeholder="الترجمة تظهر هنا." dir="auto" style="margin-top:12px"></textarea>
     <div class="row" style="margin-top:12px">
       <button id="copyTransBtn" class="sec">نسخ الترجمة</button>
     </div>
     <div id="copyMsg" class="hint"></div>
-    <p class="hint">القراءة والنسخ يعملان على جهازك دون اتصال (بعد تحميل كل لغة أول مرة). الترجمة وحدها تحتاج اتصالاً بالإنترنت.</p>
+    <p class="hint">القراءة والنسخ يعملان على جهازك دون اتصال (بعد تحميل كل لغة قراءة أول مرة). الترجمة هنا تحتاج اتصالاً — أما داخل التطبيق فتعمل دون اتصال بين العربية والإنجليزية والهندية والأردية.</p>
   </div>
 </main>
 <footer>
@@ -157,8 +190,10 @@
   var copyBtn = document.getElementById('copyBtn');
   var copyPhonesBtn = document.getElementById('copyPhonesBtn');
   var copyTransBtn = document.getElementById('copyTransBtn');
-  var trArBtn = document.getElementById('trArBtn');
-  var trEnBtn = document.getElementById('trEnBtn');
+  var srcLang = document.getElementById('srcLang');
+  var tgtLang = document.getElementById('tgtLang');
+  var trBtn = document.getElementById('trBtn');
+  var swapBtn = document.getElementById('swapBtn');
   var copyMsg = document.getElementById('copyMsg');
   var phonesCard = document.getElementById('phonesCard');
   var phonesBox = document.getElementById('phones');
@@ -406,22 +441,24 @@
   });
 
   // الترجمة: دون اتصال إن توفّر محركها (داخل التطبيق)، وإلا عبر خدمة Google — تحتاج اتصالاً
-  function translateTo(tl, btn) {
+  function doTranslate() {
     var t = outText.value.trim();
     if (!t) { copyMsg.textContent = 'لا يوجد نص لترجمته — اقرأ صورة أولاً.'; return; }
+    var src = srcLang.value, tgt = tgtLang.value;
+    if (src === tgt) { transText.value = t; copyMsg.textContent = 'النص بنفس اللغة المختارة — لا حاجة للترجمة.'; return; }
     if (window.OFFLINE_TRANSLATE) {
-      btn.disabled = true;
+      trBtn.disabled = true;
       copyMsg.textContent = 'جارٍ الترجمة دون اتصال…';
-      window.OFFLINE_TRANSLATE(t, tl,
-        function (res) { transText.value = res; copyMsg.textContent = 'اكتملت الترجمة دون اتصال.'; btn.disabled = false; },
-        function () { onlineTranslate(t, tl, btn); },
+      window.OFFLINE_TRANSLATE(t, src, tgt,
+        function (res) { transText.value = res; copyMsg.textContent = 'اكتملت الترجمة دون اتصال.'; trBtn.disabled = false; },
+        function () { onlineTranslate(t, src, tgt); },
         function (p) { copyMsg.textContent = p; });
       return;
     }
-    onlineTranslate(t, tl, btn);
+    onlineTranslate(t, src, tgt);
   }
-  function onlineTranslate(t, tl, btn) {
-    btn.disabled = true;
+  function onlineTranslate(t, src, tgt) {
+    trBtn.disabled = true;
     copyMsg.textContent = 'جارٍ الترجمة…';
     var chunks = [];
     var rest = t;
@@ -437,7 +474,7 @@
     var chain = Promise.resolve();
     chunks.forEach(function (ch) {
       chain = chain.then(function () {
-        var url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=' + tl + '&dt=t&q=' + encodeURIComponent(ch);
+        var url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=' + src + '&tl=' + tgt + '&dt=t&q=' + encodeURIComponent(ch);
         return fetch(url).then(function (r) { return r.json(); }).then(function (j) {
           var s = '';
           (j[0] || []).forEach(function (seg) { if (seg[0]) s += seg[0]; });
@@ -448,14 +485,18 @@
     chain.then(function () {
       transText.value = out.join('\n');
       copyMsg.textContent = 'اكتملت الترجمة.';
-      btn.disabled = false;
+      trBtn.disabled = false;
     }).catch(function () {
-      copyMsg.textContent = 'تعذّرت الترجمة — الترجمة تحتاج اتصالاً بالإنترنت.';
-      btn.disabled = false;
+      copyMsg.textContent = 'تعذّرت الترجمة — هذا الزوج من اللغات يحتاج اتصالاً بالإنترنت.';
+      trBtn.disabled = false;
     });
   }
-  trArBtn.addEventListener('click', function () { translateTo('ar', trArBtn); });
-  trEnBtn.addEventListener('click', function () { translateTo('en', trEnBtn); });
+  trBtn.addEventListener('click', doTranslate);
+  swapBtn.addEventListener('click', function () {
+    var v = srcLang.value;
+    srcLang.value = tgtLang.value;
+    tgtLang.value = v;
+  });
 
   copyBtn.addEventListener('click', function () {
     var t = outText.value.trim();
