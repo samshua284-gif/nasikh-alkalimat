@@ -75,10 +75,10 @@
     border-radius:4px; display:none; pointer-events:none;
   }
   .grip {
-    position:absolute; width:48px; height:24px; transform:translate(-50%,-50%);
-    background:#2e7d32; color:#fff; border:2px solid #fff; border-radius:12px;
-    font-size:13px; font-weight:700; line-height:20px; text-align:center; cursor:grab;
-    touch-action:none; z-index:3; box-shadow:0 1px 6px rgba(0,0,0,.4);
+    position:absolute; width:30px; height:16px; transform:translate(-50%,-50%);
+    background:#2e7d32; color:#fff; border:1.5px solid #fff; border-radius:8px;
+    font-size:10px; font-weight:700; line-height:13px; text-align:center; cursor:grab;
+    touch-action:none; z-index:3; box-shadow:0 1px 4px rgba(0,0,0,.35);
     user-select:none; -webkit-user-select:none; display:none;
   }
   .chips { display:flex; flex-wrap:wrap; gap:8px; }
@@ -118,6 +118,8 @@
       <div id="selBox"></div>
       <div id="gripTop" class="grip">↕</div>
       <div id="gripBot" class="grip">↕</div>
+      <div id="gripLeft" class="grip">↔</div>
+      <div id="gripRight" class="grip">↔</div>
     </div>
     <p class="hint">اضغط «تحديد منطقة» ثم اسحب فوق الجزء المطلوب — تُقرأ المنطقة المحددة فقط، ويمكنك ضبط حدّيها العلوي والسفلي بدقة بسحب المقبض الأخضر ↕ على كل حدّ. بعد اكتمال التحديد مرّر الصفحة بحرية، فالمربع ثابت على الصورة ولن يختفي. بلا تحديد تُقرأ الصورة كاملة. يمكنك أيضاً لصق صورة منسوخة (Ctrl+V).</p>
   </div>
@@ -228,6 +230,8 @@
   var selBox = document.getElementById('selBox');
   var gripTop = document.getElementById('gripTop');
   var gripBot = document.getElementById('gripBot');
+  var gripLeft = document.getElementById('gripLeft');
+  var gripRight = document.getElementById('gripRight');
   var bar = document.getElementById('bar');
   var barFill = document.getElementById('barFill');
   var msg = document.getElementById('msg');
@@ -366,7 +370,7 @@
     };
   }
   function drawSel() {
-    if (!sel) { selBox.style.display = 'none'; clearSelBtn.style.display = 'none'; gripTop.style.display = 'none'; gripBot.style.display = 'none'; return; }
+    if (!sel) { selBox.style.display = 'none'; clearSelBtn.style.display = 'none'; gripTop.style.display = 'none'; gripBot.style.display = 'none'; gripLeft.style.display = 'none'; gripRight.style.display = 'none'; return; }
     // مواضع بالنسبة المئوية من حجم الصورة — لا تتأثر بتمرير الصفحة ولا بتغيّر حجمها
     selBox.style.display = 'block';
     selBox.style.left = (sel.x * 100) + '%';
@@ -375,33 +379,49 @@
     selBox.style.height = (sel.h * 100) + '%';
     clearSelBtn.style.display = '';
     var cx = ((sel.x + sel.w / 2) * 100) + '%';
+    var cy = ((sel.y + sel.h / 2) * 100) + '%';
     gripTop.style.display = 'block';
     gripTop.style.left = cx;
     gripTop.style.top = (sel.y * 100) + '%';
     gripBot.style.display = 'block';
     gripBot.style.left = cx;
     gripBot.style.top = ((sel.y + sel.h) * 100) + '%';
+    gripLeft.style.display = 'block';
+    gripLeft.style.left = (sel.x * 100) + '%';
+    gripLeft.style.top = cy;
+    gripRight.style.display = 'block';
+    gripRight.style.left = ((sel.x + sel.w) * 100) + '%';
+    gripRight.style.top = cy;
   }
-  // سحب المقبضين: ضبط الحدّ العلوي والسفلي للمربع يدوياً بعد رسمه
+  // سحب المقابض: ضبط حدود المربع الأربعة يدوياً بعد رسمه
   var gripDrag = null;
   function gripDown(which) {
     return function (e) {
       if (!sel) return;
       e.preventDefault();
       try { e.target.setPointerCapture(e.pointerId); } catch (err) {}
-      gripDrag = { which: which, startY: relPos(e).y, orig: { x: sel.x, y: sel.y, w: sel.w, h: sel.h } };
+      var p = relPos(e);
+      gripDrag = { which: which, startX: p.x, startY: p.y, orig: { x: sel.x, y: sel.y, w: sel.w, h: sel.h } };
     };
   }
   function gripMove(e) {
     if (!gripDrag) return;
-    var dy = relPos(e).y - gripDrag.startY;
+    var p = relPos(e);
+    var dx = p.x - gripDrag.startX;
+    var dy = p.y - gripDrag.startY;
     var o = gripDrag.orig;
     if (gripDrag.which === 'top') {
       var ny = Math.min(o.y + o.h - 0.03, Math.max(0, o.y + dy));
       sel = { x: o.x, y: ny, w: o.w, h: o.h + (o.y - ny) };
-    } else {
+    } else if (gripDrag.which === 'bot') {
       var nh = Math.min(1 - o.y, Math.max(0.03, o.h + dy));
       sel = { x: o.x, y: o.y, w: o.w, h: nh };
+    } else if (gripDrag.which === 'left') {
+      var nx = Math.min(o.x + o.w - 0.03, Math.max(0, o.x + dx));
+      sel = { x: nx, y: o.y, w: o.w + (o.x - nx), h: o.h };
+    } else {
+      var nw = Math.min(1 - o.x, Math.max(0.03, o.w + dx));
+      sel = { x: o.x, y: o.y, w: nw, h: o.h };
     }
     drawSel();
   }
@@ -412,7 +432,9 @@
   }
   gripTop.addEventListener('pointerdown', gripDown('top'));
   gripBot.addEventListener('pointerdown', gripDown('bot'));
-  [gripTop, gripBot].forEach(function (g) {
+  gripLeft.addEventListener('pointerdown', gripDown('left'));
+  gripRight.addEventListener('pointerdown', gripDown('right'));
+  [gripTop, gripBot, gripLeft, gripRight].forEach(function (g) {
     g.addEventListener('pointermove', gripMove);
     g.addEventListener('pointerup', gripUp);
     g.addEventListener('pointercancel', gripUp);
