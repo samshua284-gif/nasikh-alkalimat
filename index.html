@@ -372,12 +372,20 @@
     var canvas;
     try { canvas = prepareCanvas(sourceCanvas()); }
     catch (e) { canvas = currentImage; }
-    Tesseract.recognize(canvas, getLangs(), {
+    var opts = {
       logger: function (m) {
         if (m.status === 'recognizing text') setProgress(m.progress, 'جارٍ قراءة النص… ' + Math.round(m.progress * 100) + '%');
         else if (m.status) setProgress(m.progress || 0, 'جارٍ تحميل محرك القراءة ولغاته…');
       }
-    }).then(function (res) {
+    };
+    if (window.OCR_LOCAL) {
+      opts.workerPath = 'tess/worker.min.js';
+      opts.corePath = 'tess';
+      opts.langPath = 'tess/lang';
+      opts.cacheMethod = 'none';
+      opts.gzip = true;
+    }
+    Tesseract.recognize(canvas, getLangs(), opts).then(function (res) {
       var text = (res.data.text || '').replace(/\n{3,}/g, '\n\n').trim();
       outText.value = text;
       renderPhones(extractPhones(text));
